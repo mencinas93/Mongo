@@ -1,0 +1,117 @@
+#1 
+mongoimport --db MongoDB --collection Books --file BOOKSDATA.json --jsonArray
+
+mongosh
+use MongoDB
+db.Books.find()
+
+
+
+
+
+#2
+#(a) List the title and price of books published in 2017 (any date in 2017) with a price less than $20.
+
+
+db.Books.aggregate([
+  {
+    $addFields: {
+      FixedDate: {
+        $dateFromParts: {
+          year: { $toInt: { $arrayElemAt: [{ $split: ["$date", "/"] }, 2] } },
+          month: { $toInt: { $arrayElemAt: [{ $split: ["$date", "/"] }, 0] } },
+          day: { $toInt: { $arrayElemAt: [{ $split: ["$date", "/"] }, 1] } }
+        }
+      }
+    }
+  },
+  {
+    $match: {
+      FixedDate: {
+        $gte: ISODate("2017-01-01"),
+        $lt: ISODate("2018-01-01")
+      },
+      price: { $lt: 20 }
+    }
+  },
+  {
+    $project: { title: 1, price: 1, _id: 0 }
+  },
+  {
+    $sort: { price: 1 }
+  }
+])
+
+
+
+#(b) List the first and last name of authors of books published by a German publisher.
+
+db.Books.aggregate([
+  {
+    $match: {
+      "publisher.address.country": "Germany"
+    }
+  },
+  {
+    $unwind: "$authors"
+  },
+  {
+    $project: {
+      _id: 0,
+      "First Name": "$authors.first",
+      "Last Name": "$authors.last"
+    }
+  }
+])
+
+
+#(c) List the name and city of publishers of books where all the authors are over the age of 35.
+
+
+db.Books.aggregate([
+  {
+    $unwind: "$authors" 
+  },
+  {
+    $group: {
+      _id: "$_id", 
+      title: { $first: "$title" }, 
+      publisher: { $first: "$publisher" }, 
+      minAge: { $min: "$authors.age" }
+    }
+  },
+  {
+    $match: {
+      minAge: { $gt: 35 } 
+    }
+  },
+  {
+    $group: {
+      _id: { name: "$publisher.name", city: "$publisher.address.city" } 
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      "Publisher Name": "$_id.name",
+      "Publisher City": "$_id.city"
+    }
+  }
+])
+
+#4. 
+
+
+db.Books.aggregate([
+  { $unwind: "$authors" },
+  {
+    $group: {
+      _id: {
+        author1: "$authors.first",
+        author2: "$authors.last"
+      },
+      books: { $addToSet: "$title" }
+    }
+  }
+]);
+
